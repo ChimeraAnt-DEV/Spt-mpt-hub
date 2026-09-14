@@ -1840,12 +1840,39 @@ function Library:CreateWindow(options)
 					Window.ConfigElements[name] = { Set = internalSet, Get = function() return currentKey.Name end }
 				end
 
+				-- // COMPAT SHIM: Labels for section elements (main hub uses AddLabel)
+				function Elements:AddLabel(text, infoData)
+					local LabelFrame = Create("Frame", {Parent = ItemContainer, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 18), AutomaticSize = Enum.AutomaticSize.Y})
+					local Label = Create("TextLabel", {Parent = LabelFrame, Text = tostring(text or ""), Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = W_SubText, BackgroundTransparency = 1, Size = UDim2.new(1, -20, 0, 16), Position = UDim2.new(0, 10, 0, 0), TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true, AutomaticSize = Enum.AutomaticSize.Y})
+					Create("UIPadding", {Parent = LabelFrame, PaddingBottom = UDim.new(0, 2)})
+					if type(infoData) == "string" then AttachTooltip(Label, infoData) end
+					return Label
+				end
+
 				return Elements
 			end
 			return PageObj
 		end
 
-		if isDefault then
+		-- // COMPAT SHIM: TabConfig:CreateSection auto-creates a page and returns its Elements
+		function TabConfig:CreateSection(sectionName)
+			local pg = TabConfig.CurrentPage
+			if not pg then
+				if #TabConfig.Pages == 0 then
+					pg = TabConfig:CreatePage("Main")
+					TabConfig.CurrentPage = pg
+				elseif TabConfig.Pages[1] then
+					pg = TabConfig.Pages[1]
+					TabConfig.CurrentPage = pg
+					if pg.Scroll then
+						pg.Scroll.Visible = true
+					end
+				end
+			end
+			return pg:CreateSection(sectionName)
+		end
+
+		if isDefault or not Window.CurrentTab then
 			TabBtn.BackgroundTransparency = 0
 			Indicator.Size = UDim2.new(0, 3, 0, 18)
 			Txt.TextColor3 = W_Text
@@ -1883,7 +1910,7 @@ if loadSuccess and loadResult then
         table.insert(AdminUI.WhitelistedUsers, player.DisplayName)
     end
 else
-    warn(`[EXO] FATAL: Failed to load AdmianianUI Core: {loadResult or \"Unknown error\"}. Aborting.`)
+    warn("[EXO] FATAL: Failed to load AdmianianUI Core: " .. tostring(loadResult or "Unknown error") .. ". Aborting.")
     error("AdmianUI load failed")
     return
 end
@@ -8390,7 +8417,7 @@ do
         return closest
     end
 
-    local function tgGetProgress(): number, number
+    local function tgGetProgress(): (number, number)
         local owned: number = 0
         local total: number = #_tg_tool_rules
         for _, rule in _tg_tool_rules do
@@ -9504,7 +9531,7 @@ do
         return table.concat(features, ", ")
     end
 
-    local function AI_GetSuccessRate(): number, number, number
+    local function AI_GetSuccessRate(): (number, number, number)
         local successes: number = 0
         local failures: number = 0
         if type(AIMemory.StrategyResults) == "table" then
@@ -10281,7 +10308,7 @@ do
                 latencyEstimate = val / 100
             end)
 
-            AuraSec:AddDropdown("Aura Targets", getServerPlayers(), function(selected)
+            AuraSec:AddDropdown("Aura Targets", getServerPlayers(), false, function(selected)
                 table.clear(Aura.TargetList)
                 if type(selected) == "table" then
                     for _, name in selected do
